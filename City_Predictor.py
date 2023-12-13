@@ -1,8 +1,13 @@
 import json
 import shapefile
+import geopandas as gpd
+import matplotlib.pyplot as plt
+
+from shapely.geometry import Point, Polygon, MultiPolygon
 from urllib.parse import urlencode
 from urllib.request import urlopen, urlretrieve
 from sign_url import sign_url
+
 try:
 	from config import api_key
 	from config import secret
@@ -97,3 +102,38 @@ def create_top10_boundaries():
 			w.record(*shaperec.record)
 			w.shape(shaperec.shape)
 	w.close()
+
+def get_n_points(n, shape):
+	bbox = shape.bbox
+	type = shape.__geo_interface__['type']
+	coords = shape.__geo_interface__['coordinates']
+	print(coords)
+	if type == 'MultiPolygon':
+		poly = MultiPolygon(coords)
+	elif type == 'Polygon':
+		poly = Polygon(coords)
+	else:
+		raise(RuntimeError(f'unexpected type from shape: {type}'))
+	#gdf_poly = gpd.GeoDataFrame(index=['temp'], geometry=[poly])
+	#poly = Polygon(shape_dct['Houston'].__geo_interface__)
+	#print(poly)
+
+def get_multipolygon(shape):
+	return MultiPolygon([Polygon(p[0],p[1:]) for p in shape.__geo_interface__['coordinates']])
+	
+def plot_multipolygon(mp):
+	for p in mp.geoms:
+		plt.plot(*p.exterior.xy)
+		for hole in p.interiors:
+			plt.plot(*hole.xy)
+	plt.show()
+	
+sf = shapefile.Reader("shapefiles/USTop10.shp")
+
+#'Houston', 'Jacksonville', 'New York', 'Philadelphia', 'Charlotte', 'Columbus', 'Indianapolis', 'Chicago', 'Phoenix', 'Los Angeles'
+shape_dct = {}
+for shaperec in sf.iterShapeRecords():
+	shape_dct[shaperec.record[0]] = shaperec.shape
+	
+mp = get_multipolygon(shape_dct['Houston'])
+plot_multipolygon(mp)
