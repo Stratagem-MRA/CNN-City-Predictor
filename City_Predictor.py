@@ -106,26 +106,32 @@ def create_top10_boundaries():
 def get_n_points(n, shape):
 	bbox = shape.bbox
 	type = shape.__geo_interface__['type']
-	coords = shape.__geo_interface__['coordinates']
-	print(coords)
 	if type == 'MultiPolygon':
-		poly = MultiPolygon(coords)
+		p = get_multipolygon(shape)
 	elif type == 'Polygon':
-		poly = Polygon(coords)
+		p = get_polygon(shape)
 	else:
 		raise(RuntimeError(f'unexpected type from shape: {type}'))
-	#gdf_poly = gpd.GeoDataFrame(index=['temp'], geometry=[poly])
-	#poly = Polygon(shape_dct['Houston'].__geo_interface__)
-	#print(poly)
+		
+	gdf_poly = gpd.GeoDataFrame(index=['temp'], geometry=[p])
 
 def get_multipolygon(shape):
 	return MultiPolygon([Polygon(p[0],p[1:]) for p in shape.__geo_interface__['coordinates']])
-	
+
+def get_polygon(shape):
+	return Polygon(shape.__geo_interface__['coordinates'][0],shape.__geo_interface__['coordinates'][1:])
+
 def plot_multipolygon(mp):
 	for p in mp.geoms:
 		plt.plot(*p.exterior.xy)
 		for hole in p.interiors:
 			plt.plot(*hole.xy)
+	plt.show()
+	
+def plot_polygon(p):
+	plt.plot(*p.exterior.xy)
+	for hole in p.interiors:
+		plt.plot(*hole.xy)
 	plt.show()
 	
 sf = shapefile.Reader("shapefiles/USTop10.shp")
@@ -134,6 +140,4 @@ sf = shapefile.Reader("shapefiles/USTop10.shp")
 shape_dct = {}
 for shaperec in sf.iterShapeRecords():
 	shape_dct[shaperec.record[0]] = shaperec.shape
-	
-mp = get_multipolygon(shape_dct['Houston'])
-plot_multipolygon(mp)
+get_n_points(1, shape_dct['Houston'])
