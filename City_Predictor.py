@@ -82,3 +82,18 @@ def url_builder(location, size=[640,640], key=api_key(), heading=None, fov=None,
 	return input_url_builder(location, size=size, key=key, heading=heading, fov=fov, pitch=pitch, radius=radius)
 	
 #urlretrieve(url,'temp.jpeg')
+
+def create_top10_boundaries():
+	#https://catalog.data.gov/dataset/500-cities-city-boundaries
+	sf = shapefile.Reader("City_Bounds/CityBoundaries.shp")
+
+	#Above data was from 2010 census so manually select top 10 US cities by 2020 population
+	cities = [('New York', 'NY'), ('Los Angeles', 'CA'), ('Chicago', 'IL'), ('Houston', 'TX'), ('Phoenix', 'AZ'), ('Philadelphia', 'PA'), ('Jacksonville', 'FL'), ('Columbus', 'OH'), ('Charlotte', 'NC'), ('Indianapolis', 'IN')]
+
+	w = shapefile.Writer('shapefiles/USTop10')
+	w.fields = sf.fields[1:]
+	for shaperec in sf.iterShapeRecords():
+		if (shaperec.record[0],shaperec.record[2]) in cities:
+			w.record(*shaperec.record)
+			w.shape(shaperec.shape)
+	w.close()
