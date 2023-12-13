@@ -1,7 +1,9 @@
 import json
 import shapefile
+import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import numpy as np
 
 from shapely.geometry import Point, Polygon, MultiPolygon
 from urllib.parse import urlencode
@@ -102,19 +104,7 @@ def create_top10_boundaries():
 			w.record(*shaperec.record)
 			w.shape(shaperec.shape)
 	w.close()
-
-def get_n_points(n, shape):
-	bbox = shape.bbox
-	type = shape.__geo_interface__['type']
-	if type == 'MultiPolygon':
-		p = get_multipolygon(shape)
-	elif type == 'Polygon':
-		p = get_polygon(shape)
-	else:
-		raise(RuntimeError(f'unexpected type from shape: {type}'))
-		
-	gdf_poly = gpd.GeoDataFrame(index=['temp'], geometry=[p])
-
+	
 def get_multipolygon(shape):
 	return MultiPolygon([Polygon(p[0],p[1:]) for p in shape.__geo_interface__['coordinates']])
 
@@ -133,6 +123,36 @@ def plot_polygon(p):
 	for hole in p.interiors:
 		plt.plot(*hole.xy)
 	plt.show()
+#Random_Points_in_Bounds courtesy of https://www.matecdev.com/posts/random-points-in-polygon.html
+def Random_Points_in_Bounds(polygon, number):   
+    minx, miny, maxx, maxy = polygon.bounds
+    x = np.random.uniform( minx, maxx, number )
+    y = np.random.uniform( miny, maxy, number )
+    return x, y
+	
+def get_n_points(n, shape):
+	"""
+	Given a shape returns a GeoDataFrame containing the points and a GeoDataFrame containing the polygon
+	The number of returned points will be in the range [0,n]
+	"""
+	bbox = shape.bbox
+	type = shape.__geo_interface__['type']
+	if type == 'MultiPolygon':
+		p = get_multipolygon(shape)
+	elif type == 'Polygon':
+		p = get_polygon(shape)
+	else:
+		raise(RuntimeError(f'unexpected type from shape: {type}'))
+		
+	#Following portion of get_n_points courtesy of https://www.matecdev.com/posts/random-points-in-polygon.html
+	gdf_poly = gpd.GeoDataFrame(index=['myPoly'], geometry=[p])
+	x,y = Random_Points_in_Bounds(p,n)
+	df = pd.DataFrame()
+	df['points'] = list(zip(x,y))
+	df['points'] = df['points'].apply(Point)
+	gdf_points = gpd.GeoDataFrame(df, geometry='points')
+	Sjoin = gpd.tools.sjoin(gdf_points, gdf_poly, predicate="within", how='left')
+	return gdf_points[Sjoin.index_right=='myPoly'], gdf_poly
 	
 sf = shapefile.Reader("shapefiles/USTop10.shp")
 
@@ -140,4 +160,5 @@ sf = shapefile.Reader("shapefiles/USTop10.shp")
 shape_dct = {}
 for shaperec in sf.iterShapeRecords():
 	shape_dct[shaperec.record[0]] = shaperec.shape
-get_n_points(1, shape_dct['Houston'])
+	
+points, base = get_n_points(10000, shape_dct['Houston'])
