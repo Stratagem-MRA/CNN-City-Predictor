@@ -89,22 +89,16 @@ def url_builder(location, size=[640,640], key=api_key(), heading=None, fov=None,
 	return input_url_builder(location, size=size, key=key, heading=heading, fov=fov, pitch=pitch, radius=radius)
 	
 #urlretrieve(url,'temp.jpeg')
-
 def create_top10_boundaries():
-	#https://catalog.data.gov/dataset/500-cities-city-boundaries
-	sf = shapefile.Reader("City_Bounds/CityBoundaries.shp")
-
-	#Above data was from 2010 census so manually select top 10 US cities by 2020 population
+	#Data was from 2010 census so manually select top 10 US cities by 2020 population with the added restriction only one city is allowed per state.
 	cities = [('New York', 'NY'), ('Los Angeles', 'CA'), ('Chicago', 'IL'), ('Houston', 'TX'), ('Phoenix', 'AZ'), ('Philadelphia', 'PA'), ('Jacksonville', 'FL'), ('Columbus', 'OH'), ('Charlotte', 'NC'), ('Indianapolis', 'IN')]
-
-	w = shapefile.Writer('shapefiles/USTop10')
-	w.fields = sf.fields[1:]
-	for shaperec in sf.iterShapeRecords():
-		if (shaperec.record[0],shaperec.record[2]) in cities:
-			w.record(*shaperec.record)
-			w.shape(shaperec.shape)
-	w.close()
 	
+	#https://catalog.data.gov/dataset/500-cities-city-boundaries
+	gdf = gpd.read_file("City_Bounds/CityBoundaries.shp")
+	gdf = gdf[gdf[['NAME','ST']].apply(tuple, axis=1).isin(cities)]
+	gdf = gdf.to_crs("epsg:4326")
+	gdf.to_file('shapefiles/USTop10.shp')
+
 def get_multipolygon(shape):
 	return MultiPolygon([Polygon(p[0],p[1:]) for p in shape.__geo_interface__['coordinates']])
 
@@ -123,42 +117,45 @@ def plot_polygon(p):
 	for hole in p.interiors:
 		plt.plot(*hole.xy)
 	plt.show()
-#Random_Points_in_Bounds courtesy of https://www.matecdev.com/posts/random-points-in-polygon.html
-def Random_Points_in_Bounds(polygon, number):   
-    minx, miny, maxx, maxy = polygon.bounds
-    x = np.random.uniform( minx, maxx, number )
-    y = np.random.uniform( miny, maxy, number )
-    return x, y
 	
-def get_n_points(n, shape):
+def plot_points(points, poly):
+	base = poly.boundary.plot(linewidth=1, edgecolor='black')
+	points.plot(ax=base, markersize=4)
+	plt.show()
+	
+#Random_Points_in_Bounds courtesy of https://www.matecdev.com/posts/random-points-in-polygon.html
+def Random_Points_in_Bounds(polygon, number):
+	minx, miny, maxx, maxy = polygon[0].bounds
+	x = np.random.uniform( minx, maxx, number )
+	y = np.random.uniform( miny, maxy, number )
+	return x, y
+	
+def get_polys(gdf_row):
+	gdf = gpd.GeoDataFrame(geometry=[gdf_row['geometry']], crs="epsg:4326")
+	gdf['NAME'] = gdf_row['NAME']
+	return gdf
+	
+def get_n_points(gdf_poly, n):
 	"""
-	Given a shape returns a GeoDataFrame containing the points and a GeoDataFrame containing the polygon
+	Given a GeoDataFrame row returns a GeoDataFrame containing the points and a GeoDataFrame containing the polygon
 	The number of returned points will be in the range [0,n]
 	"""
-	bbox = shape.bbox
-	type = shape.__geo_interface__['type']
-	if type == 'MultiPolygon':
-		p = get_multipolygon(shape)
-	elif type == 'Polygon':
-		p = get_polygon(shape)
-	else:
-		raise(RuntimeError(f'unexpected type from shape: {type}'))
-		
+
 	#Following portion of get_n_points courtesy of https://www.matecdev.com/posts/random-points-in-polygon.html
-	gdf_poly = gpd.GeoDataFrame(index=['myPoly'], geometry=[p])
-	x,y = Random_Points_in_Bounds(p,n)
+	x,y = Random_Points_in_Bounds(gdf_poly['geometry'],n)
 	df = pd.DataFrame()
 	df['points'] = list(zip(x,y))
 	df['points'] = df['points'].apply(Point)
-	gdf_points = gpd.GeoDataFrame(df, geometry='points')
+	gdf_points = gpd.GeoDataFrame(df,columns=['points'], geometry='points', crs="epsg:4326")
+	gdf_points['NAME'] = gdf_poly['NAME'][0]
 	Sjoin = gpd.tools.sjoin(gdf_points, gdf_poly, predicate="within", how='left')
-	return gdf_points[Sjoin.index_right=='myPoly'], gdf_poly
-	
-sf = shapefile.Reader("shapefiles/USTop10.shp")
+	return gdf_points[Sjoin.index_right==0]
 
-#'Houston', 'Jacksonville', 'New York', 'Philadelphia', 'Charlotte', 'Columbus', 'Indianapolis', 'Chicago', 'Phoenix', 'Los Angeles'
-shape_dct = {}
-for shaperec in sf.iterShapeRecords():
-	shape_dct[shaperec.record[0]] = shaperec.shape
-	
-points, base = get_n_points(10000, shape_dct['Houston'])
+#create_top10_boundaries()
+def create_points():
+	gdf = gpd.read_file("shapefiles/USTop10.shp")
+	gdf_polys = gdf.apply(get_polys, axis=1)
+	gdf_points = gdf_polys.apply(get_n_points, args=(10000,))
+
+	for points in gdf_points:
+		points['points'].to_file(f"shapefiles/{points['NAME'].iloc[0]}.shp")
