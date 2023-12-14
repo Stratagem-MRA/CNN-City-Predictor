@@ -3,6 +3,8 @@ import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
+import StreetAPI as SAPI
+import json
 
 from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.plotting import plot_polygon
@@ -19,7 +21,7 @@ def create_top10_boundaries():
 		gdf = gdf.to_crs("epsg:4326")
 		gdf.to_file('shapefiles/USTop10.shp')
 		print('Created shapefiles/USTop10.shp')
-	print("Loaded shapefiles/USTop10.shp")
+	print("Loaded shapefiles/USTop10.shp\n")
 	return gpd.read_file("shapefiles/USTop10.shp")
 	
 def plot_points(points, poly):
@@ -65,9 +67,46 @@ def create_points():
 			print(f"Created shapefiles/{gdf.iloc[i]['NAME']}.shp")
 		result.append(gpd.read_file(f"shapefiles/{gdf.iloc[i]['NAME']}.shp"))
 		print(f"Loaded shapefiles/{gdf.iloc[i]['NAME']}.shp")
+	print()
 	return result
+	
+def get_points_metadata(points):
+	path = f"metadata/{points.iloc[0]['NAME']}.csv"
+	if not isfile(path):
+		print(f"Creating {path}")
+		length = len(points)
+		print(f'0/{length}\t0.00%')
+		hit = 0
+		miss = 0
+		i = 0
+		dct = {}
+		for point in points['geometry']:
+			lat = point.y
+			lng = point.x
+			url = SAPI.meta_url_builder((lat,lng))
+			body = json.loads(SAPI.url_open(url))
+			status = body['status']
+			if status == 'OK':
+				hit = hit + 1
+				dct[body['pano_id']] = body
+			else:
+				miss = miss + 1
+			i = i+1
+			if(i%int(length/20)==0):
+				print(f'{i}/{length}\t{i/length*100:.2f}%')
+				
+		print(f'hits:{hit}\tmisses:{miss}\thit percent:{hit/(hit+miss)*100:.2f}%\tduplicates:{hit-len(dct)}\n')
+		df = pd.DataFrame(dct.values())
+		df.to_csv(path, index=False)
+	else:
+		print(f"Loading {path}\n")
+		df = pd.read_csv(path)
+	return df
+
 
 if __name__ == "__main__":		
 	bounds = create_top10_boundaries()
 	points = create_points()
+	for p in points:
+		get_points_metadata(p)
 	#plot_points(points[0],bounds.iloc[0]['geometry'])
