@@ -100,7 +100,9 @@ def create_top10_boundaries():
 		gdf = gdf[gdf[['NAME','ST']].apply(tuple, axis=1).isin(cities)]
 		gdf = gdf.to_crs("epsg:4326")
 		gdf.to_file('shapefiles/USTop10.shp')
-		print('Saved shapefiles/USTop10.shp')
+		print('Created shapefiles/USTop10.shp')
+	print("Loaded shapefiles/USTop10.shp")
+	return gpd.read_file("shapefiles/USTop10.shp")
 
 def get_multipolygon(shape):
 	return MultiPolygon([Polygon(p[0],p[1:]) for p in shape.__geo_interface__['coordinates']])
@@ -162,15 +164,14 @@ def create_points():
 		if not isfile(f"shapefiles/{gdf.iloc[i]['NAME']}.shp"):
 			poly = get_polys(gdf.iloc[i])
 			points = get_n_points(poly,10000)
-			print(f"Saved shapefiles/{gdf.iloc[i]['NAME']}.shp")
 			points.to_file(f"shapefiles/{gdf.iloc[i]['NAME']}.shp")
-			result.append(points)
-		else:
-			result.append(gpd.read_file(f"shapefiles/{gdf.iloc[i]['NAME']}.shp"))
+			print(f"Created shapefiles/{gdf.iloc[i]['NAME']}.shp")
+		result.append(gpd.read_file(f"shapefiles/{gdf.iloc[i]['NAME']}.shp"))
+		print(f"Loaded shapefiles/{gdf.iloc[i]['NAME']}.shp")
 	return result
 
 if __name__ == "__main__":		
-	create_top10_boundaries()
-	create_points()
+	bounds = create_top10_boundaries()
+	points = create_points()
 	
 #TODO we may want to split this in two files since API stuff seems pretty unrelated to the rest
