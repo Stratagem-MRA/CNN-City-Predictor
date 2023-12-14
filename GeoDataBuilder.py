@@ -6,9 +6,11 @@ import numpy as np
 import StreetAPI as SAPI
 import json
 
+from urllib.request import urlretrieve
 from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.plotting import plot_polygon
 from os.path import isfile
+from ast import literal_eval
 
 def create_top10_boundaries():
 	if not isfile('shapefiles/USTop10.shp'):
@@ -102,11 +104,28 @@ def get_points_metadata(points):
 		print(f"Loading {path}\n")
 		df = pd.read_csv(path)
 	return df
+	
+def get_image_from_metadata(df_row):
+	location = literal_eval(df_row['location'])
+	fov = 120
+	heading = [0,120,240]
+	urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[0]),f"{df_row['pano_id']}___{fov}___{heading[0]}___{df_row['name']}.jpg")
+	urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[1]),f"{df_row['pano_id']}___{fov}___{heading[1]}___{df_row['name']}.jpg")
+	urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[2]),f"{df_row['pano_id']}___{fov}___{heading[2]}___{df_row['name']}.jpg")
 
+#def get_all_images_from_metadata(metadata_df):
+#	print(df.head())
+#	get_image_from_metadata(metadata_df.iloc[0])
+	
 
 if __name__ == "__main__":		
 	bounds = create_top10_boundaries()
-	points = create_points()
-	for p in points:
-		get_points_metadata(p)
+	#points = create_points()
+	#for p in points:
+	#	get_points_metadata(p)
 	#plot_points(points[0],bounds.iloc[0]['geometry'])
+	for name in bounds['NAME']:
+		df = pd.read_csv(f"metadata/{name}.csv")
+		df['name'] = name
+		get_all_images_from_metadata(df)
+		break
