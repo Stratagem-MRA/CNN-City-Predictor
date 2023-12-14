@@ -9,6 +9,7 @@ from shapely.geometry import Point, Polygon, MultiPolygon
 from urllib.parse import urlencode
 from urllib.request import urlopen, urlretrieve
 from sign_url import sign_url
+from os.path import isfile
 
 try:
 	from config import api_key
@@ -90,14 +91,17 @@ def url_builder(location, size=[640,640], key=api_key(), heading=None, fov=None,
 	
 #urlretrieve(url,'temp.jpeg')
 def create_top10_boundaries():
-	#Data was from 2010 census so manually select top 10 US cities by 2020 population with the added restriction only one city is allowed per state.
-	cities = [('New York', 'NY'), ('Los Angeles', 'CA'), ('Chicago', 'IL'), ('Houston', 'TX'), ('Phoenix', 'AZ'), ('Philadelphia', 'PA'), ('Jacksonville', 'FL'), ('Columbus', 'OH'), ('Charlotte', 'NC'), ('Indianapolis', 'IN')]
-	
-	#https://catalog.data.gov/dataset/500-cities-city-boundaries
-	gdf = gpd.read_file("City_Bounds/CityBoundaries.shp")
-	gdf = gdf[gdf[['NAME','ST']].apply(tuple, axis=1).isin(cities)]
-	gdf = gdf.to_crs("epsg:4326")
-	gdf.to_file('shapefiles/USTop10.shp')
+	if not isfile('shapefiles/USTop10.shp'):
+		#Data was from 2010 census so manually select top 10 US cities by 2020 population with the added restriction only one city is allowed per state.
+		cities = [('New York', 'NY'), ('Los Angeles', 'CA'), ('Chicago', 'IL'), ('Houston', 'TX'), ('Phoenix', 'AZ'), ('Philadelphia', 'PA'), ('Jacksonville', 'FL'), ('Columbus', 'OH'), ('Charlotte', 'NC'), ('Indianapolis', 'IN')]
+		
+		#https://catalog.data.gov/dataset/500-cities-city-boundaries
+		gdf = gpd.read_file("City_Bounds/CityBoundaries.shp")
+		gdf = gdf[gdf[['NAME','ST']].apply(tuple, axis=1).isin(cities)]
+		gdf = gdf.to_crs("epsg:4326")
+		gdf.to_file('shapefiles/USTop10.shp')
+	else:
+		print('skipping create_top10_boundaries(), shapefiles/USTop10.shp already exists')
 
 def get_multipolygon(shape):
 	return MultiPolygon([Polygon(p[0],p[1:]) for p in shape.__geo_interface__['coordinates']])
@@ -154,8 +158,19 @@ def get_n_points(gdf_poly, n):
 #create_top10_boundaries()
 def create_points():
 	gdf = gpd.read_file("shapefiles/USTop10.shp")
+	for name in gdf['NAME']:
+		if not isfile(f"shapefiles/{name}.shp"):
+			#TODO can we incorporate get_polys() and get_n_points() here?
+			break
+	else:
+		print(f'skipping create_points(), shapefiles already exist for {gdf["NAME"]}')
+		return
 	gdf_polys = gdf.apply(get_polys, axis=1)
 	gdf_points = gdf_polys.apply(get_n_points, args=(10000,))
 
 	for points in gdf_points:
 		points['points'].to_file(f"shapefiles/{points['NAME'].iloc[0]}.shp")
+
+if __name__ == "__main__":		
+	create_top10_boundaries()
+	create_points()
