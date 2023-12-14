@@ -82,4 +82,8 @@ def url_builder(location, size=[640,640], key=api_key(), heading=None, fov=None,
 		
 	return input_url_builder(location, size=size, key=key, heading=heading, fov=fov, pitch=pitch, radius=radius)
 	
+def url_open(url):
+	with urlopen(url) as response:
+		body = response.read()
+	return body
 #urlretrieve(url,'temp.jpeg')
