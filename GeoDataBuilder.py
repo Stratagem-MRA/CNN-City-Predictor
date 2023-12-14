@@ -1,16 +1,19 @@
-import shapefile
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import StreetAPI as SAPI
+import shapefile
 import json
+
 
 from urllib.request import urlretrieve
 from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.plotting import plot_polygon
-from os.path import isfile
+from os.path import isfile, isdir
+from os import mkdir
 from ast import literal_eval
+from multiprocessing import Pool
 
 def create_top10_boundaries():
 	if not isfile('shapefiles/USTop10.shp'):
@@ -104,18 +107,29 @@ def get_points_metadata(points):
 		print(f"Loading {path}\n")
 		df = pd.read_csv(path)
 	return df
-	
-def get_image_from_metadata(df_row):
+
+def create_output_dir(name):
+	if not isdir("Images/"):
+		mkdir("Images/")
+	if not isdir(f"Images/{name}/"):
+		mkdir(f"Images/{name}/")
+
+def get_image_from_metadata(df_row_tuple):
+	#df_row_tuple = (idx,df_row)
+	idx = df_row_tuple[0]
+	df_row = df_row_tuple[1]
 	location = literal_eval(df_row['location'])
 	fov = 120
 	heading = [0,120,240]
-	urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[0]),f"{df_row['pano_id']}___{fov}___{heading[0]}___{df_row['name']}.jpg")
-	urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[1]),f"{df_row['pano_id']}___{fov}___{heading[1]}___{df_row['name']}.jpg")
-	urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[2]),f"{df_row['pano_id']}___{fov}___{heading[2]}___{df_row['name']}.jpg")
+	path = [f"Images/{df_row['name']}/{df_row['pano_id']}___{fov}___{head}___{df_row['name']}.jpg" for head in heading]
+	for i in range(len(heading)):
+		if not isfile(path[i]):
+			urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[i]),path[i])
 
-#def get_all_images_from_metadata(metadata_df):
-#	print(df.head())
-#	get_image_from_metadata(metadata_df.iloc[0])
+def get_all_images_from_metadata(metadata_df):
+	df = metadata_df.iloc[0:10]
+	with Pool(7) as p:
+		p.map(get_image_from_metadata, df.iterrows())
 	
 
 if __name__ == "__main__":		
@@ -127,5 +141,6 @@ if __name__ == "__main__":
 	for name in bounds['NAME']:
 		df = pd.read_csv(f"metadata/{name}.csv")
 		df['name'] = name
+		create_output_dir(name)
 		get_all_images_from_metadata(df)
 		break
