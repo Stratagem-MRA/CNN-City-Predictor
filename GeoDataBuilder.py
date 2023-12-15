@@ -104,7 +104,7 @@ def get_points_metadata(points):
 		df = pd.DataFrame(dct.values())
 		df.to_csv(path, index=False)
 	else:
-		print(f"Loading {path}\n")
+		print(f"Loading {path}")
 		df = pd.read_csv(path)
 	return df
 
@@ -115,32 +115,36 @@ def create_output_dir(name):
 		mkdir(f"Images/{name}/")
 
 def get_image_from_metadata(df_row_tuple):
-	#df_row_tuple = (idx,df_row)
 	idx = df_row_tuple[0]
 	df_row = df_row_tuple[1]
 	location = literal_eval(df_row['location'])
 	fov = 120
 	heading = [0,120,240]
 	path = [f"Images/{df_row['name']}/{df_row['pano_id']}___{fov}___{head}___{df_row['name']}.jpg" for head in heading]
+	print(f"{df_row['name']} {idx}")
 	for i in range(len(heading)):
 		if not isfile(path[i]):
-			urlretrieve(SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[i]),path[i])
+			url = SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[i])
+			if url is not None:
+				urlretrieve(url,path[i])
+	return 0
 
 def get_all_images_from_metadata(metadata_df):
-	df = metadata_df.iloc[0:10]
-	with Pool(7) as p:
-		p.map(get_image_from_metadata, df.iterrows())
+	print(f"Getting images for {metadata_df.iloc[0]['name']}")
+	df = metadata_df.iloc[0:1000]
+	with Pool(8) as p:
+		_ = p.map(get_image_from_metadata, df.iterrows())
 	
 
 if __name__ == "__main__":		
 	bounds = create_top10_boundaries()
-	#points = create_points()
-	#for p in points:
-	#	get_points_metadata(p)
-	#plot_points(points[0],bounds.iloc[0]['geometry'])
+	points = create_points()
+	for p in points:
+		get_points_metadata(p)
 	for name in bounds['NAME']:
 		df = pd.read_csv(f"metadata/{name}.csv")
 		df['name'] = name
 		create_output_dir(name)
 		get_all_images_from_metadata(df)
-		break
+		
+#plot_points(points[0],bounds.iloc[0]['geometry'])
