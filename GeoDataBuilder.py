@@ -130,8 +130,8 @@ def get_image_from_metadata(df_row_tuple):
 
 def get_all_images_from_metadata(metadata_df):
 	print(f"Getting images for {metadata_df.iloc[0]['name']}")
-	#limiting df to 1000 results in roughly 60000 api calls, 30k of which are charged at 0.007$ for a total of $210 
-	df = metadata_df.iloc[0:1000]
+	#limiting df to 2000 results in roughly 120000 api calls, 60k of which are charged at 0.007$ for a total of $420
+	df = metadata_df.iloc[0:2000]
 	with Pool(8) as p:
 		p.map(get_image_from_metadata, df.iterrows())
 	
