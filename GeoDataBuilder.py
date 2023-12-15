@@ -127,13 +127,13 @@ def get_image_from_metadata(df_row_tuple):
 			url = SAPI.url_builder((location['lat'],location['lng']), fov=fov, heading=heading[i])
 			if url is not None:
 				urlretrieve(url,path[i])
-	return 0
 
 def get_all_images_from_metadata(metadata_df):
 	print(f"Getting images for {metadata_df.iloc[0]['name']}")
+	#limiting df to 1000 results in roughly 60000 api calls, 30k of which are charged at 0.007$ for a total of $210 
 	df = metadata_df.iloc[0:1000]
 	with Pool(8) as p:
-		_ = p.map(get_image_from_metadata, df.iterrows())
+		p.map(get_image_from_metadata, df.iterrows())
 	
 
 if __name__ == "__main__":		
